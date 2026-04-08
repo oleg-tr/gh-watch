@@ -1,7 +1,8 @@
+use std::collections::HashMap;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 
-use crate::api::Client;
+use crate::api::{Client, Notification};
 use crate::config;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -25,6 +26,24 @@ fn cyan(s: &str) -> String { format!("\x1b[36m{s}\x1b[0m") }
 fn yellow(s: &str) -> String { format!("\x1b[33m{s}\x1b[0m") }
 fn magenta(s: &str) -> String { format!("\x1b[35m{s}\x1b[0m") }
 fn green(s: &str) -> String { format!("\x1b[32m{s}\x1b[0m") }
+fn red(s: &str) -> String { format!("\x1b[31m{s}\x1b[0m") }
+
+fn truncate_body(body: &str, max: usize) -> String {
+    let single_line: String = body.split_whitespace().collect::<Vec<_>>().join(" ");
+    if single_line.len() <= max {
+        single_line
+    } else {
+        format!("{}...", &single_line[..max])
+    }
+}
+
+fn print_comment_info(client: &Client, n: &Notification) {
+    if let Some(url) = &n.subject.latest_comment_url {
+        if let Ok(comment) = client.comment(url) {
+            println!("      {}  {}", yellow(&comment.user.login), dim(&truncate_body(&comment.body, 120)));
+        }
+    }
+}
 
 // ── Commands ──────────────────────────────────────────────────────────────────
 
@@ -43,6 +62,7 @@ pub fn mentions(client: &Client, all: bool) -> Result<()> {
         let icon = if n.subject.kind == "PullRequest" { "⎇" } else { "◉" };
         println!("  {icon}  {}  {}", cyan(&n.repository.full_name), n.subject.title);
         println!("      {}", dim(&time_ago(&n.updated_at)));
+        print_comment_info(client, n);
         println!();
     }
     Ok(())
@@ -51,7 +71,7 @@ pub fn mentions(client: &Client, all: bool) -> Result<()> {
 pub fn my_prs(client: &Client, all: bool) -> Result<()> {
     header("── My PRs ────────────────────────────────────");
     let notes = client.notifications(all)?;
-    let relevant = ["review_requested", "comment", "author"];
+    let relevant = ["author"];
     let hits: Vec<_> = notes.iter()
         .filter(|n| n.subject.kind == "PullRequest" && relevant.contains(&n.reason.as_str()))
         .collect();
@@ -63,9 +83,44 @@ pub fn my_prs(client: &Client, all: bool) -> Result<()> {
 
     println!("  {} PR update(s)\n", hits.len());
     for n in hits {
-        let reason = n.reason.replace('_', " ");
         println!("  ⎇  {}  {}", cyan(&n.repository.full_name), n.subject.title);
-        println!("      {}  ·  {}", yellow(&reason), dim(&time_ago(&n.updated_at)));
+
+        // Fetch and display reviews
+        if let Some(url) = &n.subject.url {
+            if let Ok(reviews) = client.reviews(url) {
+                // Deduplicate: keep only the latest review per reviewer
+                let mut latest_by_user: HashMap<String, &crate::api::Review> = HashMap::new();
+                for review in &reviews {
+                    let dominated = latest_by_user
+                        .get(&review.user.login)
+                        .map_or(true, |existing| review.submitted_at > existing.submitted_at);
+                    if dominated {
+                        latest_by_user.insert(review.user.login.clone(), review);
+                    }
+                }
+
+                let mut sorted: Vec<_> = latest_by_user.values().collect();
+                sorted.sort_by_key(|r| r.submitted_at);
+
+                for review in sorted {
+                    match review.state.as_str() {
+                        "APPROVED" => {
+                            println!("      {}", green(&format!("✓ approved by {}", review.user.login)));
+                        }
+                        "CHANGES_REQUESTED" => {
+                            println!("      {}", red(&format!("✗ changes requested by {}", review.user.login)));
+                        }
+                        "COMMENTED" => {
+                            println!("      {}", dim(&format!("💬 review comment by {}", review.user.login)));
+                        }
+                        _ => {} // Skip PENDING, DISMISSED
+                    }
+                }
+            }
+        }
+
+        print_comment_info(client, n);
+        println!("      {}", dim(&time_ago(&n.updated_at)));
         println!();
     }
     Ok(())

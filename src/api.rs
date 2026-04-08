@@ -21,6 +21,14 @@ pub struct Subject {
     pub title: String,
     #[serde(rename = "type")]
     pub kind: String,
+    pub url: Option<String>,
+    pub latest_comment_url: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct Comment {
+    pub user: Actor,
+    pub body: String,
 }
 
 #[derive(Deserialize)]
@@ -40,6 +48,14 @@ pub struct Event {
 #[derive(Deserialize)]
 pub struct Actor {
     pub login: String,
+}
+
+#[derive(Deserialize)]
+pub struct Review {
+    pub user: Actor,
+    pub state: String,
+    pub body: String,
+    pub submitted_at: DateTime<Utc>,
 }
 
 // ── Client ────────────────────────────────────────────────────────────────────
@@ -99,6 +115,14 @@ impl Client {
             &format!("{BASE}/repos/{repo}/events"),
             &[("per_page", per.as_str())],
         )
+    }
+
+    pub fn comment(&self, url: &str) -> Result<Comment> {
+        self.get(url, &[])
+    }
+
+    pub fn reviews(&self, pr_api_url: &str) -> Result<Vec<Review>> {
+        self.get(&format!("{pr_api_url}/reviews"), &[])
     }
 
     /// Just checks if a repo is accessible — used when adding to watch list.
