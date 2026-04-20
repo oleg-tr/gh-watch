@@ -55,14 +55,12 @@ pub struct Actor {
 pub struct Review {
     pub user: Actor,
     pub state: String,
-    pub body: String,
     pub submitted_at: DateTime<Utc>,
 }
 
 pub struct ResolvedThread {
     pub repo: String,
     pub pr_title: String,
-    pub pr_url: String,
     pub comment_body: String,
     pub updated_at: DateTime<Utc>,
 }
@@ -195,7 +193,6 @@ impl Client {
             nodes {{
               ... on PullRequest {{
                 title
-                url
                 updatedAt
                 repository {{ nameWithOwner }}
                 reviewThreads(first: 100) {{
@@ -227,7 +224,6 @@ impl Client {
         for pr in nodes {
             let repo = pr["repository"]["nameWithOwner"].as_str().unwrap_or("");
             let title = pr["title"].as_str().unwrap_or("");
-            let url = pr["url"].as_str().unwrap_or("");
             let updated = pr["updatedAt"].as_str().unwrap_or("");
 
             let thread_nodes = pr["reviewThreads"]["nodes"]
@@ -254,7 +250,6 @@ impl Client {
                     results.push(ResolvedThread {
                         repo: repo.to_string(),
                         pr_title: title.to_string(),
-                        pr_url: url.to_string(),
                         comment_body: body,
                         updated_at: parsed_date,
                     });
