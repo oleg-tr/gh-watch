@@ -1,6 +1,6 @@
 # ghw - GitHub notifications without the noise
 
-A terminal dashboard for GitHub notifications. Shows @mentions, activity on your PRs, and event feeds from repos you watch.
+A terminal dashboard for GitHub notifications. Shows @mentions, activity on your PRs, threads you commented on, and event feeds from repos you watch.
 
 ## 1. Install Rust
 
@@ -82,6 +82,7 @@ chmod 600 ~/.config/ghw/token
 ghw                  # full dashboard (mentions + PRs + feed)
 ghw mentions         # PRs/issues where you were @mentioned
 ghw my-prs           # reviews and comments on your own PRs
+ghw threads          # conversations you commented on + resolved review comments
 ghw feed             # recent activity in watched repos
 ghw watch owner/repo # add a repo to your watch list
 ghw unwatch owner/repo
@@ -92,7 +93,7 @@ ghw watched          # list watched repos
 
 | Flag | Commands | Description |
 |------|----------|-------------|
-| `-a, --all` | `mentions`, `my-prs` | Include already-read notifications |
+| `-a, --all` | `mentions`, `my-prs`, `threads` | Include already-read notifications |
 | `-l, --limit N` | `feed` | Number of events per repo (default: 10) |
 
 ## Watch List
