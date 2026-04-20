@@ -126,6 +126,44 @@ pub fn my_prs(client: &Client, all: bool) -> Result<()> {
     Ok(())
 }
 
+pub fn threads(client: &Client, all: bool) -> Result<()> {
+    header("── Threads ───────────────────────────────────");
+    let notes = client.notifications(all)?;
+    let hits: Vec<_> = notes.iter().filter(|n| n.reason == "comment").collect();
+
+    if hits.is_empty() {
+        println!("  {}", green("✓ No updates on your threads."));
+    } else {
+        println!("  {} thread update(s)\n", hits.len());
+        for n in hits {
+            let icon = if n.subject.kind == "PullRequest" { "⎇" } else { "◉" };
+            println!("  {icon}  {}  {}", cyan(&n.repository.full_name), n.subject.title);
+            print_comment_info(client, n);
+            println!("      {}", dim(&time_ago(&n.updated_at)));
+            println!();
+        }
+    }
+
+    // Resolved review threads (from GraphQL — not covered by notifications)
+    match client.resolved_threads() {
+        Ok(resolved) if !resolved.is_empty() => {
+            println!("\n  {}\n", dim(&format!("{} resolved comment(s)", resolved.len())));
+            for r in &resolved {
+                println!("  ⎇  {}  {}", cyan(&r.repo), r.pr_title);
+                println!("      {}", dim(&truncate_body(&r.comment_body, 120)));
+                println!("      {}", dim(&time_ago(&r.updated_at)));
+                println!();
+            }
+        }
+        Err(e) => {
+            println!("\n  {}", dim(&format!("Could not fetch resolved threads: {e}")));
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
 pub fn feed(client: &Client, limit: usize) -> Result<()> {
     header("── Feed ──────────────────────────────────────");
     let repos = config::load();

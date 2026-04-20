@@ -58,6 +58,14 @@ pub struct Review {
     pub submitted_at: DateTime<Utc>,
 }
 
+pub struct ResolvedThread {
+    pub repo: String,
+    pub pr_title: String,
+    pub pr_url: String,
+    pub comment_body: String,
+    pub updated_at: DateTime<Utc>,
+}
+
 // ── Client ────────────────────────────────────────────────────────────────────
 
 pub struct Client {
@@ -128,6 +136,117 @@ impl Client {
     /// Just checks if a repo is accessible — used when adding to watch list.
     pub fn repo_exists(&self, repo: &str) -> bool {
         self.get::<serde_json::Value>(&format!("{BASE}/repos/{repo}"), &[]).is_ok()
+    }
+
+    fn graphql(&self, query: &str) -> Result<serde_json::Value> {
+        let body = serde_json::json!({ "query": query });
+        let resp = self.inner
+            .post("https://api.github.com/graphql")
+            .bearer_auth(&self.token)
+            .header("Accept", "application/vnd.github+json")
+            .header("X-GitHub-Api-Version", "2022-11-28")
+            .json(&body)
+            .send()
+            .context("GraphQL request failed")?;
+
+        match resp.status().as_u16() {
+            401 => return Err(anyhow!("Bad token — check your GITHUB_TOKEN.")),
+            s if s >= 400 => return Err(anyhow!("GitHub GraphQL error: HTTP {s}")),
+            _ => {}
+        }
+
+        let json: serde_json::Value = resp.json()?;
+        if let Some(errors) = json.get("errors") {
+            return Err(anyhow!("GraphQL errors: {errors}"));
+        }
+        Ok(json)
+    }
+
+    pub fn viewer_login(&self) -> Result<String> {
+        let json = self.graphql("{ viewer { login } }")?;
+        json["data"]["viewer"]["login"]
+            .as_str()
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow!("Could not determine your GitHub username"))
+    }
+
+    pub fn resolved_threads(&self) -> Result<Vec<ResolvedThread>> {
+        let login = self.viewer_login()?;
+        let since = (Utc::now() - chrono::Duration::days(7)).format("%Y-%m-%d");
+        let query = format!(r#"
+        {{
+          search(query: "reviewed-by:{login} is:pr updated:>={since}", type: ISSUE, first: 30) {{
+            nodes {{
+              ... on PullRequest {{
+                title
+                url
+                updatedAt
+                repository {{ nameWithOwner }}
+                reviewThreads(first: 100) {{
+                  nodes {{
+                    isResolved
+                    comments(first: 10) {{
+                      nodes {{
+                        author {{ login }}
+                        body
+                        createdAt
+                      }}
+                    }}
+                  }}
+                }}
+              }}
+            }}
+          }}
+        }}
+        "#);
+
+        let json = self.graphql(&query)?;
+        let mut results = Vec::new();
+        let empty = vec![];
+
+        let nodes = json["data"]["search"]["nodes"]
+            .as_array()
+            .unwrap_or(&empty);
+
+        for pr in nodes {
+            let repo = pr["repository"]["nameWithOwner"].as_str().unwrap_or("");
+            let title = pr["title"].as_str().unwrap_or("");
+            let url = pr["url"].as_str().unwrap_or("");
+            let updated = pr["updatedAt"].as_str().unwrap_or("");
+
+            let thread_nodes = pr["reviewThreads"]["nodes"]
+                .as_array()
+                .unwrap_or(&empty);
+
+            for thread in thread_nodes {
+                if thread["isResolved"].as_bool() != Some(true) {
+                    continue;
+                }
+
+                let comments = thread["comments"]["nodes"]
+                    .as_array()
+                    .unwrap_or(&empty);
+
+                let user_comment = comments.iter().find(|c| {
+                    c["author"]["login"].as_str() == Some(&login)
+                });
+
+                if let Some(comment) = user_comment {
+                    let body = comment["body"].as_str().unwrap_or("").to_string();
+                    let parsed_date = updated.parse::<DateTime<Utc>>().unwrap_or_else(|_| Utc::now());
+
+                    results.push(ResolvedThread {
+                        repo: repo.to_string(),
+                        pr_title: title.to_string(),
+                        pr_url: url.to_string(),
+                        comment_body: body,
+                        updated_at: parsed_date,
+                    });
+                }
+            }
+        }
+
+        Ok(results)
     }
 }
 
