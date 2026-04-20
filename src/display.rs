@@ -28,6 +28,20 @@ fn magenta(s: &str) -> String { format!("\x1b[35m{s}\x1b[0m") }
 fn green(s: &str) -> String { format!("\x1b[32m{s}\x1b[0m") }
 fn red(s: &str) -> String { format!("\x1b[31m{s}\x1b[0m") }
 
+fn threads_cleared_at() -> Option<DateTime<Utc>> {
+    let path = dirs::config_dir()?.join("ghw/threads_cleared_at");
+    let s = std::fs::read_to_string(path).ok()?;
+    s.trim().parse().ok()
+}
+
+fn save_threads_cleared_at() {
+    if let Some(dir) = dirs::config_dir() {
+        let path = dir.join("ghw/threads_cleared_at");
+        let _ = std::fs::create_dir_all(path.parent().unwrap());
+        let _ = std::fs::write(path, Utc::now().to_rfc3339());
+    }
+}
+
 fn truncate_body(body: &str, max: usize) -> String {
     let single_line: String = body.split_whitespace().collect::<Vec<_>>().join(" ");
     if single_line.len() <= max {
@@ -126,7 +140,19 @@ pub fn my_prs(client: &Client, all: bool) -> Result<()> {
     Ok(())
 }
 
-pub fn threads(client: &Client, all: bool) -> Result<()> {
+pub fn threads(client: &Client, all: bool, clear: bool) -> Result<()> {
+    if clear {
+        let notes = client.notifications(false)?;
+        let hits: Vec<_> = notes.iter().filter(|n| n.reason == "comment").collect();
+        let count = hits.len();
+        for n in &hits {
+            client.mark_thread_read(&n.id)?;
+        }
+        save_threads_cleared_at();
+        println!("  Marked {count} thread notification(s) as read.");
+        return Ok(());
+    }
+
     header("── Threads ───────────────────────────────────");
     let notes = client.notifications(all)?;
     let hits: Vec<_> = notes.iter().filter(|n| n.reason == "comment").collect();
@@ -147,12 +173,18 @@ pub fn threads(client: &Client, all: bool) -> Result<()> {
     // Resolved review threads (from GraphQL — not covered by notifications)
     match client.resolved_threads() {
         Ok(resolved) if !resolved.is_empty() => {
-            println!("\n  {}\n", dim(&format!("{} resolved comment(s)", resolved.len())));
-            for r in &resolved {
-                println!("  ⎇  {}  {}", cyan(&r.repo), r.pr_title);
-                println!("      {}", dim(&truncate_body(&r.comment_body, 120)));
-                println!("      {}", dim(&time_ago(&r.updated_at)));
-                println!();
+            let cutoff = threads_cleared_at();
+            let visible: Vec<_> = resolved.iter()
+                .filter(|r| cutoff.map_or(true, |c| r.updated_at > c))
+                .collect();
+            if !visible.is_empty() {
+                println!("\n  {}\n", dim(&format!("{} resolved comment(s)", visible.len())));
+                for r in &visible {
+                    println!("  ⎇  {}  {}", cyan(&r.repo), r.pr_title);
+                    println!("      {}", dim(&truncate_body(&r.comment_body, 120)));
+                    println!("      {}", dim(&time_ago(&r.updated_at)));
+                    println!();
+                }
             }
         }
         Err(e) => {

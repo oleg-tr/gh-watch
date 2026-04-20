@@ -83,6 +83,7 @@ ghw                  # full dashboard (mentions + PRs + feed)
 ghw mentions         # PRs/issues where you were @mentioned
 ghw my-prs           # reviews and comments on your own PRs
 ghw threads          # conversations you commented on + resolved review comments
+ghw threads -c       # mark thread notifications as read
 ghw feed             # recent activity in watched repos
 ghw watch owner/repo # add a repo to your watch list
 ghw unwatch owner/repo
@@ -94,6 +95,7 @@ ghw watched          # list watched repos
 | Flag | Commands | Description |
 |------|----------|-------------|
 | `-a, --all` | `mentions`, `my-prs`, `threads` | Include already-read notifications |
+| `-c, --clear` | `threads` | Mark thread notifications as read |
 | `-l, --limit N` | `feed` | Number of events per repo (default: 10) |
 
 ## Watch List

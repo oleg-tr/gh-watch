@@ -10,6 +10,7 @@ const BASE: &str = "https://api.github.com";
 
 #[derive(Deserialize)]
 pub struct Notification {
+    pub id: String,
     pub reason: String,
     pub updated_at: DateTime<Utc>,
     pub subject: Subject,
@@ -115,6 +116,21 @@ impl Client {
     pub fn notifications(&self, include_read: bool) -> Result<Vec<Notification>> {
         let all = if include_read { "true" } else { "false" };
         self.get(&format!("{BASE}/notifications"), &[("all", all), ("per_page", "50")])
+    }
+
+    pub fn mark_thread_read(&self, thread_id: &str) -> Result<()> {
+        let resp = self.inner
+            .patch(&format!("{BASE}/notifications/threads/{thread_id}"))
+            .bearer_auth(&self.token)
+            .header("Accept", "application/vnd.github+json")
+            .header("X-GitHub-Api-Version", "2022-11-28")
+            .send()
+            .context("Failed to mark thread as read")?;
+
+        if !resp.status().is_success() {
+            return Err(anyhow!("Failed to mark thread {thread_id} as read: HTTP {}", resp.status().as_u16()));
+        }
+        Ok(())
     }
 
     pub fn events(&self, repo: &str, limit: usize) -> Result<Vec<Event>> {

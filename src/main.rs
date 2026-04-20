@@ -29,6 +29,8 @@ enum Cmd {
     Threads {
         #[arg(short, long, help = "Include already-read notifications")]
         all: bool,
+        #[arg(short, long, help = "Mark thread notifications as read")]
+        clear: bool,
     },
     /// Recent activity in your watched repos
     Feed {
@@ -52,7 +54,7 @@ fn main() -> Result<()> {
     match cli.command.unwrap_or(Cmd::Status) {
         Cmd::Mentions { all }    => display::mentions(&client, all),
         Cmd::MyPrs { all }       => display::my_prs(&client, all),
-        Cmd::Threads { all }     => display::threads(&client, all),
+        Cmd::Threads { all, clear } => display::threads(&client, all, clear),
         Cmd::Feed { limit }      => display::feed(&client, limit),
         Cmd::Watch { repo }      => config::watch(&client, &repo),
         Cmd::Unwatch { repo }    => config::unwatch(&repo),
@@ -60,7 +62,7 @@ fn main() -> Result<()> {
         Cmd::Status              => {
             display::mentions(&client, false)?;
             display::my_prs(&client, false)?;
-            display::threads(&client, false)?;
+            display::threads(&client, false, false)?;
             display::feed(&client, 8)
         }
     }
