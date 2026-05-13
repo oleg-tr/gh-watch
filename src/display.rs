@@ -144,12 +144,22 @@ pub fn threads(client: &Client, all: bool, clear: bool) -> Result<()> {
     if clear {
         let notes = client.notifications(false)?;
         let hits: Vec<_> = notes.iter().filter(|n| n.reason == "comment").collect();
-        let count = hits.len();
+        let notif_count = hits.len();
         for n in &hits {
             client.mark_thread_read(&n.id)?;
         }
+
+        let resolved_count = client.resolved_threads()
+            .map(|resolved| {
+                let cutoff = threads_cleared_at();
+                resolved.iter().filter(|r| cutoff.map_or(true, |c| r.updated_at > c)).count()
+            })
+            .unwrap_or(0);
+
         save_threads_cleared_at();
-        println!("  Marked {count} thread notification(s) as read.");
+
+        let total = notif_count + resolved_count;
+        println!("  Marked {total} thread(s) as read.");
         return Ok(());
     }
 
