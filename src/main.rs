@@ -49,6 +49,7 @@ enum Cmd {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
+    display::migrate_legacy_state(); // fixing a bug, will delete this later
     let client = api::Client::new()?;
 
     match cli.command.unwrap_or(Cmd::Status) {

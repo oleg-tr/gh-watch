@@ -29,17 +29,29 @@ fn green(s: &str) -> String { format!("\x1b[32m{s}\x1b[0m") }
 fn red(s: &str) -> String { format!("\x1b[31m{s}\x1b[0m") }
 
 fn threads_cleared_at() -> Option<DateTime<Utc>> {
-    let path = dirs::config_dir()?.join("ghw/threads_cleared_at");
+    let path = dirs::home_dir()?.join(".config/ghw/threads_cleared_at");
     let s = std::fs::read_to_string(path).ok()?;
     s.trim().parse().ok()
 }
 
 fn save_threads_cleared_at() {
-    if let Some(dir) = dirs::config_dir() {
-        let path = dir.join("ghw/threads_cleared_at");
+    if let Some(dir) = dirs::home_dir() {
+        let path = dir.join(".config/ghw/threads_cleared_at");
         let _ = std::fs::create_dir_all(path.parent().unwrap());
         let _ = std::fs::write(path, Utc::now().to_rfc3339());
     }
+}
+
+pub fn migrate_legacy_state() {
+    let (Some(old_dir), Some(home)) = (dirs::config_dir(), dirs::home_dir()) else { return };
+    let old = old_dir.join("ghw/threads_cleared_at");
+    let new = home.join(".config/ghw/threads_cleared_at");
+    if old == new || !old.exists() || new.exists() { return }
+    if let Some(parent) = new.parent() {
+       let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::rename(&old, &new);
+    let _ = std::fs::remove_dir(old_dir.join("ghw")); // only succeeds if empty
 }
 
 fn truncate_body(body: &str, max: usize) -> String {

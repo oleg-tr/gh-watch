@@ -262,8 +262,8 @@ impl Client {
 }
 
 fn token_from_file() -> Result<String, std::env::VarError> {
-    dirs::config_dir()
-        .and_then(|p| std::fs::read_to_string(p.join("ghw/token")).ok())
+    dirs::home_dir()
+        .and_then(|p| std::fs::read_to_string(p.join(".config/ghw/token")).ok())
         .map(|s| s.trim().to_string())
         .ok_or(std::env::VarError::NotPresent)
 }
