@@ -73,7 +73,20 @@ fn print_comment_info(client: &Client, n: &Notification) {
 
 // ── Commands ──────────────────────────────────────────────────────────────────
 
-pub fn mentions(client: &Client, all: bool) -> Result<()> {
+pub fn mentions(client: &Client, all: bool, clear: bool) -> Result<()> {
+    if clear {
+        let notes = client.notifications(false)?;
+        let hits: Vec<_> = notes.iter()
+            .filter(|n| n.reason == "mention" || n.reason == "review_requested")
+            .collect();
+        let count = hits.len();
+        for n in &hits {
+            client.mark_thread_read(&n.id)?;
+        }
+        println!("  Marked {count} mention(s) as read.");
+        return Ok(());
+    }
+
     header("── Mentions ──────────────────────────────────");
     let notes = client.notifications(all)?;
     let hits: Vec<_> = notes.iter()

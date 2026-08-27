@@ -96,7 +96,7 @@ ghw watched              # list watched repos
 | Flag | Commands | Description |
 |------|----------|-------------|
 | `-a, --all` | `mentions`, `my-prs`, `threads` | Include already-read notifications |
-| `-c, --clear` | `threads` | Mark thread notifications as read |
+| `-c, --clear` | `mentions`, `my-prs`, `threads` | Mark notifications as read | 
 | `-l, --limit N` | `feed` | Number of events per repo (default: 10) |
 
 ## Watch List

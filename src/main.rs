@@ -21,6 +21,8 @@ enum Cmd {
     Mentions {
         #[arg(short, long, help = "Include already-read notifications")]
         all: bool,
+        #[arg(short, long, help = "Mark mention notifications as read")]
+        clear: bool,
     },
     /// Reviews and comments on your own PRs
     #[command(name = "my-prs", alias = "prs")]
@@ -64,7 +66,7 @@ fn main() -> Result<()> {
     let client = api::Client::new()?;
 
     match cli.command.unwrap_or(Cmd::Status) {
-        Cmd::Mentions { all }    => display::mentions(&client, all),
+        Cmd::Mentions { all, clear } => display::mentions(&client, all, clear),
         Cmd::MyPrs { all, clear } => display::my_prs(&client, all, clear),
         Cmd::Threads { all, clear } => display::threads(&client, all, clear),
         Cmd::Feed { limit }      => display::feed(&client, limit),
@@ -72,7 +74,7 @@ fn main() -> Result<()> {
         Cmd::Unwatch { repo }    => config::unwatch(&repo),
         Cmd::Watched             => config::list_watched(),
         Cmd::Status              => {
-            display::mentions(&client, false)?;
+            display::mentions(&client, false, false)?;
             display::my_prs(&client, false, false)?;
             display::threads(&client, false, false)?;
             display::feed(&client, 8)
