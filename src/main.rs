@@ -6,8 +6,11 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "ghw", about = "GitHub notifications without the noise", version)]
+#[command(name = "ghw", about = "GitHub notifications without the noise")]
 struct Cli {
+    #[arg(short = 'v', long = "version", help = "Print version and exit", global = true)]
+    version: bool,
+
     #[command(subcommand)]
     command: Option<Cmd>,
 }
@@ -20,10 +23,12 @@ enum Cmd {
         all: bool,
     },
     /// Reviews and comments on your own PRs
-    #[command(name = "my-prs")]
+    #[command(name = "my-prs", alias = "prs")]
     MyPrs {
         #[arg(short, long, help = "Include already-read notifications")]
         all: bool,
+        #[arg(short, long, help = "Mark PR notifications as read")]
+        clear: bool,
     },
     /// Conversations you commented on
     Threads {
@@ -49,12 +54,18 @@ enum Cmd {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
+
+    if cli.version {
+        println!("ghw {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
+
     display::migrate_legacy_state(); // fixing a bug, will delete this later
     let client = api::Client::new()?;
 
     match cli.command.unwrap_or(Cmd::Status) {
         Cmd::Mentions { all }    => display::mentions(&client, all),
-        Cmd::MyPrs { all }       => display::my_prs(&client, all),
+        Cmd::MyPrs { all, clear } => display::my_prs(&client, all, clear),
         Cmd::Threads { all, clear } => display::threads(&client, all, clear),
         Cmd::Feed { limit }      => display::feed(&client, limit),
         Cmd::Watch { repo }      => config::watch(&client, &repo),
@@ -62,7 +73,7 @@ fn main() -> Result<()> {
         Cmd::Watched             => config::list_watched(),
         Cmd::Status              => {
             display::mentions(&client, false)?;
-            display::my_prs(&client, false)?;
+            display::my_prs(&client, false, false)?;
             display::threads(&client, false, false)?;
             display::feed(&client, 8)
         }

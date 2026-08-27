@@ -76,7 +76,9 @@ fn print_comment_info(client: &Client, n: &Notification) {
 pub fn mentions(client: &Client, all: bool) -> Result<()> {
     header("── Mentions ──────────────────────────────────");
     let notes = client.notifications(all)?;
-    let hits: Vec<_> = notes.iter().filter(|n| n.reason == "mention").collect();
+    let hits: Vec<_> = notes.iter()
+        .filter(|n| n.reason == "mention" || n.reason == "review_requested")
+        .collect();
 
     if hits.is_empty() {
         println!("  {}", green("✓ No unread mentions."));
@@ -94,7 +96,21 @@ pub fn mentions(client: &Client, all: bool) -> Result<()> {
     Ok(())
 }
 
-pub fn my_prs(client: &Client, all: bool) -> Result<()> {
+pub fn my_prs(client: &Client, all: bool, clear: bool) -> Result<()> {
+    if clear {
+        let notes = client.notifications(false)?;
+        let relevant = ["author"];
+        let hits: Vec<_> = notes.iter()
+            .filter(|n| n.subject.kind == "PullRequest" && relevant.contains(&n.reason.as_str()))
+            .collect();
+        let count = hits.len();
+        for n in &hits {
+            client.mark_thread_read(&n.id)?;
+        }
+        println!("  Marked {count} PR notification(s) as read.");
+        return Ok(());
+    }
+
     header("── My PRs ────────────────────────────────────");
     let notes = client.notifications(all)?;
     let relevant = ["author"];

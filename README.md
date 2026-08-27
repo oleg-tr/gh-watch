@@ -79,15 +79,16 @@ chmod 600 ~/.config/ghw/token
 ## Usage
 
 ```
-ghw                  # full dashboard (mentions + PRs + feed)
-ghw mentions         # PRs/issues where you were @mentioned
-ghw my-prs           # reviews and comments on your own PRs
-ghw threads          # conversations you commented on + resolved review comments
-ghw threads -c       # mark thread notifications as read
-ghw feed             # recent activity in watched repos
-ghw watch owner/repo # add a repo to your watch list
+ghw                      # full dashboard (mentions + PRs + feed)
+ghw mentions             # PRs/issues where you were @mentioned
+ghw my-prs (ghw prs)     # reviews and comments on your own PRs
+ghw my-prs (ghw prs) -c  # marks PR notifications read
+ghw threads              # conversations you commented on + resolved review comments
+ghw threads -c           # mark thread notifications as read
+ghw feed                 # recent activity in watched repos
+ghw watch owner/repo     # add a repo to your watch list
 ghw unwatch owner/repo
-ghw watched          # list watched repos
+ghw watched              # list watched repos
 ```
 
 ### Flags
@@ -101,3 +102,11 @@ ghw watched          # list watched repos
 ## Watch List
 
 Watched repos are stored in `~/.ghw-repos` (one `owner/repo` per line). Manage with `ghw watch` / `ghw unwatch`, or edit the file directly.
+
+
+
+## Upgrade
+
+  ```bash
+  cd gh-watch && git pull
+  cargo install --path . --force
