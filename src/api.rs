@@ -245,13 +245,19 @@ impl Client {
 
                 if let Some(comment) = user_comment {
                     let body = comment["body"].as_str().unwrap_or("").to_string();
-                    let parsed_date = updated.parse::<DateTime<Utc>>().unwrap_or_else(|_| Utc::now());
+                    // Stamp with the thread's last comment createdAt, not the PR's
+                    // updatedAt — otherwise merging the PR re-surfaces a cleared thread.
+                    let thread_updated_at = comments.iter()
+                        .filter_map(|c| c["createdAt"].as_str())
+                        .filter_map(|s| s.parse::<DateTime<Utc>>().ok())
+                        .max()
+                        .unwrap_or_else(|| updated.parse::<DateTime<Utc>>().unwrap_or_else(|_| Utc::now()));
 
                     results.push(ResolvedThread {
                         repo: repo.to_string(),
                         pr_title: title.to_string(),
                         comment_body: body,
-                        updated_at: parsed_date,
+                        updated_at: thread_updated_at,
                     });
                 }
             }
